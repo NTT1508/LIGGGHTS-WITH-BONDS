@@ -1,15 +1,19 @@
 /* ----------------------------------------------------------------------
-   LIGGGHTS - LAMMPS Improved for General Granular and Granular Heat
+   LIGGGHTS® - LAMMPS Improved for General Granular and Granular Heat
    Transfer Simulations
 
-   LIGGGHTS is part of the CFDEMproject
+   LIGGGHTS® is part of CFDEM®project
    www.liggghts.com | www.cfdem.com
 
    Christoph Kloss, christoph.kloss@cfdem.com
    Copyright 2009-2012 JKU Linz
    Copyright 2012-     DCS Computing GmbH, Linz
 
-   LIGGGHTS is based on LAMMPS
+   LIGGGHTS® and CFDEM® are registered trade marks of DCS Computing GmbH,
+   the producer of the LIGGGHTS® software and the CFDEM®coupling software
+   See http://www.cfdem.com/terms-trademark-policy for details.
+
+   LIGGGHTS® is based on LAMMPS
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
    http://lammps.sandia.gov, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
@@ -76,7 +80,7 @@ ComputePairGranLocal::ComputePairGranLocal(LAMMPS *lmp, int narg, char **arg) :
     else if (strcmp(arg[iarg],"history") == 0) hflag = 1;
     else if (strcmp(arg[iarg],"contactArea") == 0) aflag = 1;
     else if (strcmp(arg[iarg],"heatFlux") == 0) hfflag = 1;
-    else error->all(FLERR,"Invalid keyword in compute pair/gran/local or wall/gran/local command");
+    else error->compute_error(FLERR,this,"Invalid keyword");
   }
 
   // default: pair data
@@ -89,7 +93,7 @@ ComputePairGranLocal::ComputePairGranLocal(LAMMPS *lmp, int narg, char **arg) :
   pairgran = NULL;
 
   if(update->ntimestep > 0 && !modify->fix_restart_in_progress())
-    error->all(FLERR,"Need to define compute pair/gran/local or wall/gran/local before first run");
+    error->compute_error(FLERR,this,"Need to define this compute before first run");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -221,7 +225,7 @@ void ComputePairGranLocal::init_cpgl(bool requestflag)
   if(hflag && dnum == 0) error->all(FLERR,"Compute pair/gran/local or wall/gran/local can not calculate history values since pair or wall style does not compute them");
   // standard values: pos1,pos2,id1,id2,extra id for mesh wall,force,torque,contact area
 
-  nvalues = posflag*6 + velflag*6 + idflag*3 + fflag*3 + tflag*3 + hflag*dnum + aflag + hfflag;
+  nvalues = posflag*6 + velflag*6 + idflag*3 + fflag*3 + tflag*3 + hflag*dnum + aflag*5 + hfflag; //added ri,rj,distance,overlap to area-computation output
   size_local_cols = nvalues;
 
 }
@@ -424,7 +428,11 @@ void ComputePairGranLocal::add_pair(int i,int j,double fx,double fy,double fz,do
         r = sqrt(rsq);
         contactArea = - M_PI/4 * ( (r-radi-radj)*(r+radi-radj)*(r-radi+radj)*(r+radi+radj) )/rsq;
         array[ipair][n++] = contactArea;
-        
+        array[ipair][n++] = radi; 		//CR radius of 1st particle
+        array[ipair][n++] = radj; 		//CR radius of 2nd particle
+        array[ipair][n++] = r;	  		//CR =sqrt(vectorMag3DSquared(x[i]-x[j])) =distance   
+        array[ipair][n++] = radi+radj-r;	//CR overlap
+    	//printf("[%d]DEBUG: %f %f %f %f %f\n",update->ntimestep,contactArea,radi,radj,r,radi+radj-r);
     }
 
     ipair++;
@@ -547,7 +555,10 @@ void ComputePairGranLocal::add_wall_2(int i,double fx,double fy,double fz,double
     {
         contactArea = (atom->radius[i]*atom->radius[i]-rsq)*M_PI;
         array[ipair][n++] = contactArea;
-        
+        array[ipair][n++] = atom->radius[i]; 				//CR radius of particle
+        array[ipair][n++] = 0;	 					//CR dummy to match particle-particle format
+        array[ipair][n++] = sqrt(rsq);	  				//CR =sqrt(vectorMag3DSquared(x[i]-x[j])) =distance   
+        array[ipair][n++] = atom->radius[i]*atom->radius[i]-rsq;	//CR overlap        
     }
 
     // wall_1 and wall_2 are always called

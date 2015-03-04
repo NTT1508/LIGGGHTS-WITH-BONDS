@@ -175,7 +175,7 @@ void Variable::set(int narg, char **arg)
     if (find(arg[0]) >= 0) return;
     if (nvar == maxvar) grow();
     style[nvar] = LOOP;
-    int nfirst,nlast;
+    int nfirst=0,nlast=0;
     if (narg == 3 || (narg == 4 && strcmp(arg[3],"pad") == 0)) {
       nfirst = 1;
       nlast = force->inumeric(FLERR,arg[2]);
@@ -275,7 +275,7 @@ void Variable::set(int narg, char **arg)
   // data = 1 value, string to eval
 
   } else if (strcmp(arg[1],"string") == 0) {
-    if (narg != 3) error->all(FLERR,"Illegal variable command");
+    if (narg < 3) {printf("narg=%d",narg);error->all(FLERR,"Illegal variable command");}
     if (find(arg[0]) >= 0) {
       if (style[find(arg[0])] != STRING)
         error->all(FLERR,"Cannot redefine variable as a different style");
@@ -287,7 +287,23 @@ void Variable::set(int narg, char **arg)
     which[nvar] = 0;
     pad[nvar] = 0;
     data[nvar] = new char*[num[nvar]];
-    copy(1,&arg[2],data[nvar]);
+    //copy(1,&arg[2],data[nvar]);
+	    if (narg==3) {
+	    int n=strlen(arg[2])+1;
+	    data[nvar][0]=new char[n];
+	    strcpy(data[nvar][0],arg[2]);
+	    } else if (narg>=4) {
+			  int n=strlen(arg[2])+1;	//preserve one for \0
+			  for (int i=3;i<narg;i++)
+			  	n+=strlen(arg[i])+1;		//preserve one for each space
+	    		  data[nvar][0]=new char[n];
+			  strcpy(data[nvar][0],arg[2]);
+			  for (int i=3;i<narg;i++) {
+				  strcat(data[nvar][0]," ");
+				  strcat(data[nvar][0],arg[i]);
+			  }
+			 }
+
 
   // GETENV
   // remove pre-existing var if also style GETENV (allows it to be reset)
@@ -551,7 +567,7 @@ char *Variable::retrieve(char *name)
   if (ivar == -1) return NULL;
   if (which[ivar] >= num[ivar]) return NULL;
 
-  char *str;
+  char *str = NULL;
   if (style[ivar] == INDEX || style[ivar] == WORLD ||
       style[ivar] == UNIVERSE || style[ivar] == STRING ||
       style[ivar] == SCALARFILE) {
@@ -627,7 +643,7 @@ void Variable::compute_atom(int ivar, int igroup,
                             double *result, int stride, int sumflag)
 {
   Tree *tree;
-  double *vstore;
+  double *vstore = NULL;
 
   if (style[ivar] == ATOM) {
     evaluate(data[ivar][0],&tree); 
@@ -2489,8 +2505,8 @@ int Variable::math_function(char *word, char *contents, Tree **tree,
 
   // evaluate args
 
-  Tree *newtree;
-  double value1,value2,value3; 
+  Tree *newtree = NULL;
+  double value1=0.0,value2=0.0,value3=0.0; 
 
   if (tree) {
     newtree = new Tree();
@@ -2846,7 +2862,7 @@ int Variable::group_function(char *word, char *contents, Tree **tree,
 
   // match word to group function
 
-  double value;
+  double value = 0.0;
 
   if (strcmp(word,"count") == 0) {
     if (narg == 1) value = group->count(igroup);
@@ -3106,7 +3122,7 @@ int Variable::special_function(char *word, char *contents, Tree **tree,
       strcmp(word,"max") == 0 || strcmp(word,"ave") == 0 ||
       strcmp(word,"trap") == 0) {
 
-    int method;
+    int method = 0;
     if (strcmp(word,"sum") == 0) method = SUM;
     else if (strcmp(word,"min") == 0) method = XMIN;
     else if (strcmp(word,"max") == 0) method = XMAX;
@@ -3118,7 +3134,7 @@ int Variable::special_function(char *word, char *contents, Tree **tree,
 
     Compute *compute = NULL;
     Fix *fix = NULL;
-    int index,nvec,nstride;
+    int index=0,nvec=0,nstride=0;
 
     if (strstr(arg1,"c_") == arg1) {
       ptr1 = strchr(arg1,'[');
